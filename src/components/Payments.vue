@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { store } from '../store'
+import { store, hasPermission } from '../store'
 import Icons from './Icons.vue'
 
 const emit = defineEmits(['view-booking'])
@@ -142,9 +142,9 @@ const getMethodIcon = (method) => {
               <tr 
                 v-for="pay in filteredPayments" 
                 :key="pay.id" 
-                class="clickable-row"
-                @click="emit('view-booking', getBooking(pay.bookingId))"
-                title="Click to view full booking details"
+                :class="{ 'clickable-row': hasPermission('bookings_view') }"
+                @click="hasPermission('bookings_view') ? emit('view-booking', getBooking(pay.bookingId)) : null"
+                :title="hasPermission('bookings_view') ? 'Click to view full booking details' : ''"
               >
                 <td>{{ pay.date }}</td>
                 <td>
@@ -181,9 +181,9 @@ const getMethodIcon = (method) => {
           <div 
             v-for="b in outstandingBookings" 
             :key="b.id" 
-            class="outstanding-item"
-            @click="emit('view-booking', b)"
-            title="Click to view details and record payments"
+            :class="['outstanding-item', { 'clickable-row': hasPermission('bookings_view') }]"
+            @click="hasPermission('bookings_view') ? emit('view-booking', b) : null"
+            :title="hasPermission('bookings_view') ? 'Click to view details and record payments' : ''"
           >
             <div class="item-info">
               <h4>{{ b.customerName }}</h4>

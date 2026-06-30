@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { store, addBooking, updateBooking, deleteBooking, recordAdditionalPayment } from '../store'
+import { store, addBooking, updateBooking, deleteBooking, recordAdditionalPayment, hasPermission } from '../store'
 import Icons from './Icons.vue'
 
 const props = defineProps({
@@ -303,7 +303,7 @@ const closeDrawer = () => {
         <h1 class="page-title">Bookings Directory</h1>
         <p class="subtitle">Search, manage, and book events for your halls.</p>
       </div>
-      <button @click="openAddModal" class="btn btn-primary">
+      <button v-if="hasPermission('bookings_edit')" @click="openAddModal" class="btn btn-primary">
         <Icons name="plus" :size="20" stroke-width="2.5" />
         New Booking
       </button>
@@ -353,7 +353,7 @@ const closeDrawer = () => {
         <Icons name="bookings" :size="64" stroke-width="1" class="empty-icon" />
         <h3>No bookings match your criteria</h3>
         <p>Try clearing your filters or create a new booking for your customers.</p>
-        <button @click="openAddModal" class="btn btn-primary">Create New Booking</button>
+        <button v-if="hasPermission('bookings_edit')" @click="openAddModal" class="btn btn-primary">Create New Booking</button>
       </div>
 
       <!-- Desktop Table (Min Width 768px) -->
@@ -415,10 +415,10 @@ const closeDrawer = () => {
               </td>
               <td style="text-align: right;" @click.stop>
                 <div class="row-actions">
-                  <button @click="openEditModal(booking)" class="btn-icon" title="Edit Booking">
+                  <button v-if="hasPermission('bookings_edit')" @click="openEditModal(booking)" class="btn-icon" title="Edit Booking">
                     <Icons name="edit" :size="16" />
                   </button>
-                  <button @click="confirmDelete(booking.id)" class="btn-icon text-red" title="Delete Booking">
+                  <button v-if="hasPermission('bookings_edit')" @click="confirmDelete(booking.id)" class="btn-icon text-red" title="Delete Booking">
                     <Icons name="trash" :size="16" />
                   </button>
                 </div>
@@ -573,7 +573,7 @@ const closeDrawer = () => {
             <!-- Record Payment / Invoice buttons -->
             <div class="drawer-actions">
               <button 
-                v-if="currentBooking.totalPrice - currentBooking.paidAmount > 0" 
+                v-if="currentBooking.totalPrice - currentBooking.paidAmount > 0 && hasPermission('payments_edit')" 
                 @click="openPaymentModal" 
                 class="btn btn-success btn-sm btn-full"
               >
@@ -631,14 +631,14 @@ const closeDrawer = () => {
             </div>
 
             <div class="drawer-danger-zone">
-              <button @click="openEditModal(currentBooking)" class="btn btn-secondary btn-sm">
+              <button v-if="hasPermission('bookings_edit')" @click="openEditModal(currentBooking)" class="btn btn-secondary btn-sm">
                 <Icons name="edit" :size="16" />
                 Edit Details
               </button>
               
-              <button @click="confirmDelete(currentBooking.id)" class="btn btn-danger btn-sm">
+              <button v-if="hasPermission('bookings_edit')" @click="confirmDelete(currentBooking.id)" class="btn btn-danger btn-sm">
                 <Icons name="trash" :size="16" />
-                Delete Permanently
+                Delete Booking
               </button>
             </div>
           </div>

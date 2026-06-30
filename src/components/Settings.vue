@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { store, updateHallDetails, setTheme, seedDemoData } from '../store'
+import { store, updateHallDetails, setTheme, seedDemoData, hasPermission } from '../store'
 import Icons from './Icons.vue'
 
 const formName = ref(store.hallDetails.name)
@@ -72,42 +72,44 @@ const triggerSeed = () => {
         <p class="panel-subtitle">This information appears on billing invoices and customer sheets.</p>
 
         <form @submit.prevent="handleSaveDetails" class="details-form">
-          <div class="form-group">
-            <label class="form-label">Venue Name *</label>
-            <input v-model="formName" type="text" class="form-control" placeholder="e.g. Garrison Marquee Lahore" required />
-          </div>
-
-          <div class="form-row">
+          <fieldset :disabled="!hasPermission('settings_edit')" style="border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; width: 100%;">
             <div class="form-group">
-              <label class="form-label">Venue Type</label>
-              <select v-model="formType" class="form-control">
-                <option value="banquet">Banquet Hall / Shadi Hall</option>
-                <option value="marriage">Marriage Lawn / Marquee</option>
-                <option value="ballroom">Luxury Ballroom</option>
-                <option value="multi">Multi-Purpose Space</option>
-              </select>
+              <label class="form-label">Venue Name *</label>
+              <input v-model="formName" type="text" class="form-control" placeholder="e.g. Garrison Marquee Lahore" required />
             </div>
-            
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Venue Type</label>
+                <select v-model="formType" class="form-control">
+                  <option value="banquet">Banquet Hall / Shadi Hall</option>
+                  <option value="marriage">Marriage Lawn / Marquee</option>
+                  <option value="ballroom">Luxury Ballroom</option>
+                  <option value="multi">Multi-Purpose Space</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label">Maximum Guest Capacity</label>
+                <input v-model="formCapacity" type="number" class="form-control" min="1" placeholder="e.g. 800" />
+              </div>
+            </div>
+
             <div class="form-group">
-              <label class="form-label">Maximum Guest Capacity</label>
-              <input v-model="formCapacity" type="number" class="form-control" min="1" placeholder="e.g. 800" />
+              <label class="form-label">Contact Phone Number</label>
+              <input v-model="formPhone" type="tel" class="form-control" placeholder="e.g. 0300-1234567" />
             </div>
-          </div>
 
-          <div class="form-group">
-            <label class="form-label">Contact Phone Number</label>
-            <input v-model="formPhone" type="tel" class="form-control" placeholder="e.g. 0300-1234567" />
-          </div>
+            <div class="form-group">
+              <label class="form-label">Address / Location Location</label>
+              <textarea v-model="formAddress" class="form-control" rows="2" placeholder="e.g. Khyber Road, Lahore Cantt, Pakistan"></textarea>
+            </div>
 
-          <div class="form-group">
-            <label class="form-label">Address / Location Location</label>
-            <textarea v-model="formAddress" class="form-control" rows="2" placeholder="e.g. Khyber Road, Lahore Cantt, Pakistan"></textarea>
-          </div>
-
-          <button type="submit" class="btn btn-primary">
-            <Icons name="check" :size="16" />
-            Save Profile Settings
-          </button>
+            <button type="submit" class="btn btn-primary" v-if="hasPermission('settings_edit')">
+              <Icons name="check" :size="16" />
+              Save Profile Settings
+            </button>
+          </fieldset>
         </form>
       </div>
 
@@ -165,7 +167,7 @@ const triggerSeed = () => {
         </div>
 
         <!-- Dev Utilities / Seeder -->
-        <div class="utils-panel card">
+        <div class="utils-panel card" v-if="hasPermission('settings_edit')">
           <h3>Developer Utilities</h3>
           <p class="panel-subtitle">Reset states or populate data for demonstrations.</p>
           

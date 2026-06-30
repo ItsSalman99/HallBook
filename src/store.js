@@ -3,12 +3,15 @@ import { reactive, watch, nextTick } from 'vue'
 // Define the reactive store state
 export const store = reactive({
   currentOwner: null,
+  currentStaff: null,
   theme: 'light',
   activeView: 'dashboard',
   bookings: [],
   packages: [],
   payments: [],
   notifications: [],
+  roles: [],
+  staff: [],
   hallDetails: {
     name: '',
     type: 'banquet',
@@ -32,24 +35,35 @@ export function setTheme(newTheme) {
 }
 
 // Session Management
-export function setSession(owner) {
+export function setSession(owner, staff = null) {
   store.currentOwner = owner
-  localStorage.setItem('hall_current_session', JSON.stringify(owner))
+  store.currentStaff = staff
   
   if (owner) {
+    localStorage.setItem('hall_current_session', JSON.stringify({ owner, staff }))
     loadOwnerData(owner.id)
   } else {
+    localStorage.removeItem('hall_current_session')
     clearState()
   }
 }
 
 export function loadSession() {
-  const session = localStorage.getItem('hall_current_session')
-  if (session) {
-    const owner = JSON.parse(session)
-    store.currentOwner = owner
-    loadOwnerData(owner.id)
-    return owner
+  const sessionStr = localStorage.getItem('hall_current_session')
+  if (sessionStr) {
+    const session = JSON.parse(sessionStr)
+    if (session.owner) {
+      store.currentOwner = session.owner
+      store.currentStaff = session.staff || null
+      loadOwnerData(session.owner.id)
+      return session.owner
+    } else {
+      // Backwards compatibility with old owner-only sessions
+      store.currentOwner = session
+      store.currentStaff = null
+      loadOwnerData(session.id)
+      return session
+    }
   }
   return null
 }
@@ -59,6 +73,9 @@ function clearState() {
   store.packages = []
   store.payments = []
   store.notifications = []
+  store.roles = []
+  store.staff = []
+  store.currentStaff = null
   store.hallDetails = { name: '', type: 'banquet', address: '', capacity: 500, phone: '', logo: '' }
 }
 
@@ -72,6 +89,8 @@ export function loadOwnerData(ownerId) {
     store.bookings = data.bookings || []
     store.packages = data.packages || []
     store.payments = data.payments || []
+    store.roles = data.roles || []
+    store.staff = data.staff || []
     store.hallDetails = data.hallDetails || {
       name: store.currentOwner?.hallName || 'My Banquet Hall',
       type: store.currentOwner?.hallType || 'banquet',
@@ -79,6 +98,51 @@ export function loadOwnerData(ownerId) {
       capacity: store.currentOwner?.capacity || 500,
       phone: store.currentOwner?.phone || '',
       logo: ''
+    }
+    
+    // Seed default roles if none exist
+    if (store.roles.length === 0) {
+      store.roles = [
+        {
+          id: 'role_manager',
+          name: 'Manager',
+          description: 'Can manage bookings, calendar, customers, packages, and payments.',
+          permissions: {
+            dashboard_view: true,
+            bookings_view: true,
+            bookings_edit: true,
+            calendar_view: true,
+            customers_view: true,
+            packages_view: true,
+            packages_edit: true,
+            payments_view: true,
+            payments_edit: true,
+            settings_view: true,
+            settings_edit: false,
+            staff_manage: false
+          }
+        },
+        {
+          id: 'role_receptionist',
+          name: 'Receptionist',
+          description: 'Can view bookings and calendar, and manage bookings (no billing/settings/staff).',
+          permissions: {
+            dashboard_view: true,
+            bookings_view: true,
+            bookings_edit: true,
+            calendar_view: true,
+            customers_view: true,
+            packages_view: true,
+            packages_edit: false,
+            payments_view: false,
+            payments_edit: false,
+            settings_view: false,
+            settings_edit: false,
+            staff_manage: false
+          }
+        }
+      ]
+      saveOwnerData()
     }
   } else {
     // Seed default packages for new users
@@ -95,6 +159,47 @@ export function loadOwnerData(ownerId) {
       phone: store.currentOwner?.phone || '0300-1234567',
       logo: ''
     }
+    store.roles = [
+      {
+        id: 'role_manager',
+        name: 'Manager',
+        description: 'Can manage bookings, calendar, customers, packages, and payments.',
+        permissions: {
+          dashboard_view: true,
+          bookings_view: true,
+          bookings_edit: true,
+          calendar_view: true,
+          customers_view: true,
+          packages_view: true,
+          packages_edit: true,
+          payments_view: true,
+          payments_edit: true,
+          settings_view: true,
+          settings_edit: false,
+          staff_manage: false
+        }
+      },
+      {
+        id: 'role_receptionist',
+        name: 'Receptionist',
+        description: 'Can view bookings and calendar, and manage bookings (no billing/settings/staff).',
+        permissions: {
+          dashboard_view: true,
+          bookings_view: true,
+          bookings_edit: true,
+          calendar_view: true,
+          customers_view: true,
+          packages_view: true,
+          packages_edit: false,
+          payments_view: false,
+          payments_edit: false,
+          settings_view: false,
+          settings_edit: false,
+          staff_manage: false
+        }
+      }
+    ]
+    store.staff = []
     store.bookings = []
     store.payments = []
     
@@ -111,6 +216,8 @@ export function saveOwnerData() {
     bookings: store.bookings,
     packages: store.packages,
     payments: store.payments,
+    roles: store.roles,
+    staff: store.staff,
     hallDetails: store.hallDetails
   }
   localStorage.setItem(key, JSON.stringify(dataToSave))
@@ -275,6 +382,66 @@ export function updateHallDetails(details) {
 export function seedDemoData() {
   const ownerId = store.currentOwner.id
   
+  store.roles = [
+    {
+      id: 'role_demo_manager',
+      name: 'Booking Manager',
+      description: 'Full control over bookings, packages, and calendar. No payment or settings access.',
+      permissions: {
+        dashboard_view: true,
+        bookings_view: true,
+        bookings_edit: true,
+        calendar_view: true,
+        customers_view: true,
+        packages_view: true,
+        packages_edit: true,
+        payments_view: false,
+        payments_edit: false,
+        settings_view: true,
+        settings_edit: false,
+        staff_manage: false
+      }
+    },
+    {
+      id: 'role_demo_finance',
+      name: 'Finance Manager',
+      description: 'Access to financial tracking, payments, and dashboards. Cannot alter event bookings.',
+      permissions: {
+        dashboard_view: true,
+        bookings_view: true,
+        bookings_edit: false,
+        calendar_view: true,
+        customers_view: true,
+        packages_view: false,
+        packages_edit: false,
+        payments_view: true,
+        payments_edit: true,
+        settings_view: false,
+        settings_edit: false,
+        staff_manage: false
+      }
+    }
+  ]
+
+  store.staff = [
+    {
+      id: 'staff_demo_1',
+      name: 'Sarah Jenkins',
+      email: 'sarah@palace.com',
+      password: 'demo',
+      roleId: 'role_demo_manager',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'staff_demo_2',
+      name: 'Mark Davis',
+      email: 'mark@palace.com',
+      password: 'demo',
+      roleId: 'role_demo_finance',
+      createdAt: new Date().toISOString()
+    }
+  ]
+
   store.packages = [
     { id: 'pkg_1', name: 'Standard 1-Dish Package', type: 'per-guest', price: 1800, description: 'Standard stage, lighting, Chicken Qorma, Chicken Biryani, Roghni Naan, Salad, Raita, and 1 Dessert (Kheer)', services: ['Catering', 'Standard Decor', 'Sound System', 'Waiters'] },
     { id: 'pkg_2', name: 'Premium Wedding Package', type: 'per-guest', price: 2800, description: 'AC Cooling, premium floral stage decoration, grand entrance walkway, Mutton Pulao, Chicken Karahi, Seekh Kababs, Soft Drinks, 2 Desserts', services: ['Catering', 'Floral Decor', 'AC cooling', 'DJ Sound System', 'Valet Parking', 'Stage Lighting'] },
@@ -514,3 +681,67 @@ export function seedDemoData() {
 
   saveOwnerData()
 }
+
+// Roles CRUD Actions
+export function addRole(role) {
+  const newRole = {
+    id: 'role_' + Date.now(),
+    ...role
+  }
+  store.roles.push(newRole)
+  saveOwnerData()
+  return newRole
+}
+
+export function updateRole(updatedRole) {
+  const idx = store.roles.findIndex(r => r.id === updatedRole.id)
+  if (idx !== -1) {
+    store.roles[idx] = updatedRole
+    saveOwnerData()
+  }
+}
+
+export function deleteRole(roleId) {
+  const inUse = store.staff.some(s => s.roleId === roleId)
+  if (inUse) {
+    alert("Cannot delete this role because it is currently assigned to one or more staff members.")
+    return false
+  }
+  store.roles = store.roles.filter(r => r.id !== roleId)
+  saveOwnerData()
+  return true
+}
+
+// Staff CRUD Actions
+export function addStaff(staffMember) {
+  const newStaff = {
+    id: 'staff_' + Date.now(),
+    createdAt: new Date().toISOString(),
+    ...staffMember
+  }
+  store.staff.push(newStaff)
+  saveOwnerData()
+  return newStaff
+}
+
+export function updateStaff(updatedStaff) {
+  const idx = store.staff.findIndex(s => s.id === updatedStaff.id)
+  if (idx !== -1) {
+    store.staff[idx] = { ...store.staff[idx], ...updatedStaff }
+    saveOwnerData()
+  }
+}
+
+export function deleteStaff(staffId) {
+  store.staff = store.staff.filter(s => s.id !== staffId)
+  saveOwnerData()
+}
+
+// Permission Checking Helper
+export function hasPermission(permissionName) {
+  if (!store.currentStaff) return true // Owner has full access
+  const role = store.roles.find(r => r.id === store.currentStaff.roleId)
+  if (!role) return false
+  return !!role.permissions[permissionName]
+}
+

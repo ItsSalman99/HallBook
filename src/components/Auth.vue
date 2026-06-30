@@ -19,10 +19,18 @@ const phone = ref('')
 
 const handleDemoLogin = () => {
   emit('login-success', {
+    type: 'owner',
     isDemo: true,
     email: 'demo@palace.com',
     ownerName: 'Demo Owner',
     hallName: 'Royal Palace Banquet & Resort'
+  })
+}
+
+const handleDemoManagerLogin = () => {
+  emit('login-success', {
+    type: 'demo-staff',
+    email: 'sarah@palace.com'
   })
 }
 
@@ -38,13 +46,39 @@ const handleSubmit = () => {
   const owners = JSON.parse(localStorage.getItem('hall_owners') || '[]')
 
   if (isLogin.value) {
-    // Login flow
-    const owner = owners.find(o => o.email.toLowerCase() === email.value.toLowerCase() && o.password === password.value)
-    if (!owner) {
-      errorMessage.value = 'Invalid email or password.'
+    // 1. Check for Demo logins via text fields
+    if (email.value.toLowerCase() === 'demo@palace.com' && password.value === 'demo') {
+      handleDemoLogin()
       return
     }
-    emit('login-success', owner)
+    if (email.value.toLowerCase() === 'sarah@palace.com' && password.value === 'demo') {
+      handleDemoManagerLogin()
+      return
+    }
+
+    // 2. Login flow: Check owners first
+    const owner = owners.find(o => o.email.toLowerCase() === email.value.toLowerCase() && o.password === password.value)
+    if (owner) {
+      emit('login-success', { type: 'owner', data: owner })
+      return
+    }
+
+    // 3. Check staff list of all owners
+    for (const o of owners) {
+      const dataKey = `hall_data_${o.id}`
+      const dataStr = localStorage.getItem(dataKey)
+      if (dataStr) {
+        const data = JSON.parse(dataStr)
+        const staffList = data.staff || []
+        const staffMember = staffList.find(s => s.email.toLowerCase() === email.value.toLowerCase() && s.password === password.value)
+        if (staffMember) {
+          emit('login-success', { type: 'staff', owner: o, staff: staffMember })
+          return
+        }
+      }
+    }
+
+    errorMessage.value = 'Invalid email or password.'
   } else {
     // Signup flow
     if (!ownerName.value || !hallName.value || !phone.value) {
@@ -73,7 +107,7 @@ const handleSubmit = () => {
 
     owners.push(newOwner)
     localStorage.setItem('hall_owners', JSON.stringify(owners))
-    emit('login-success', newOwner)
+    emit('login-success', { type: 'owner', data: newOwner })
   }
 }
 </script>
@@ -218,14 +252,25 @@ const handleSubmit = () => {
           <span>or</span>
         </div>
 
-        <button 
-          @click="handleDemoLogin" 
-          type="button" 
-          class="btn btn-secondary btn-full demo-btn"
-        >
-          <Icons name="check-circle" :size="18" stroke-width="2.5" class="demo-icon" />
-          One-Click Demo Account
-        </button>
+        <div class="demo-buttons-container">
+          <button 
+            @click="handleDemoLogin" 
+            type="button" 
+            class="btn btn-secondary demo-btn"
+          >
+            <Icons name="check-circle" :size="18" stroke-width="2.5" class="demo-icon" />
+            Demo Admin
+          </button>
+
+          <button 
+            @click="handleDemoManagerLogin" 
+            type="button" 
+            class="btn btn-secondary demo-btn manager-demo"
+          >
+            <Icons name="shield" :size="18" stroke-width="2.5" class="demo-icon" />
+            Demo Manager
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -393,15 +438,42 @@ const handleSubmit = () => {
   margin-left: .75em;
 }
 
+.demo-buttons-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .demo-buttons-container {
+    grid-template-columns: 1fr;
+  }
+}
+
 .demo-btn {
   border: 1px dashed var(--primary);
   background-color: var(--bg-accent-soft);
   color: var(--primary);
+  width: 100%;
+}
+
+.demo-btn.manager-demo {
+  border-color: var(--success);
+  background-color: var(--success-bg);
+  color: var(--success-text);
+}
+
+.demo-btn.manager-demo .demo-icon {
+  color: var(--success);
 }
 
 .demo-btn:hover {
   background-color: var(--primary-glow);
   transform: translateY(-1px);
+}
+
+.demo-btn.manager-demo:hover {
+  background-color: rgba(16, 185, 129, 0.15);
 }
 
 .demo-icon {

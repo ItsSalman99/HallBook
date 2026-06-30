@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { store, addPackage, updatePackage, deletePackage } from '../store'
+import { store, addPackage, updatePackage, deletePackage, hasPermission } from '../store'
 import Icons from './Icons.vue'
 
 const isModalOpen = ref(false)
@@ -88,7 +88,7 @@ const confirmDelete = (pkgId) => {
         <h1 class="page-title">Packages & Pricing</h1>
         <p class="subtitle">Customize the rates, services, and amenities offered by your venue.</p>
       </div>
-      <button @click="openAddModal" class="btn btn-primary">
+      <button v-if="hasPermission('packages_edit')" @click="openAddModal" class="btn btn-primary">
         <Icons name="plus" :size="20" stroke-width="2.5" />
         Create Package
       </button>
@@ -131,7 +131,7 @@ const confirmDelete = (pkgId) => {
           </ul>
         </div>
 
-        <div class="package-actions">
+        <div class="package-actions" v-if="hasPermission('packages_edit')">
           <button @click="openEditModal(pkg)" class="btn btn-secondary btn-sm">
             <Icons name="edit" :size="14" />
             Edit Package

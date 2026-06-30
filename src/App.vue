@@ -1,12 +1,13 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed } from 'vue'
 import { 
   store, 
   loadSession, 
   setSession, 
   initTheme, 
   setTheme, 
-  seedDemoData 
+  seedDemoData,
+  hasPermission
 } from './store'
 import Auth from './components/Auth.vue'
 import Dashboard from './components/Dashboard.vue'
@@ -16,6 +17,7 @@ import Customers from './components/Customers.vue'
 import Packages from './components/Packages.vue'
 import Payments from './components/Payments.vue'
 import Settings from './components/Settings.vue'
+import Staff from './components/Staff.vue'
 import Icons from './components/Icons.vue'
 
 // Top notifications bell dropdown state
@@ -27,11 +29,48 @@ const selectedBookingForDrawer = ref(null)
 
 onMounted(() => {
   initTheme()
-  const session = loadSession()
+  loadSession()
+  enforceInitialView()
 })
 
-const handleLoginSuccess = (owner) => {
-  if (owner.isDemo) {
+const enforceInitialView = () => {
+  if (!store.currentOwner) return
+  
+  const activeItem = [
+    { id: 'dashboard', perm: 'dashboard_view' },
+    { id: 'bookings', perm: 'bookings_view' },
+    { id: 'calendar', perm: 'calendar_view' },
+    { id: 'customers', perm: 'customers_view' },
+    { id: 'packages', perm: 'packages_view' },
+    { id: 'payments', perm: 'payments_view' },
+    { id: 'settings', perm: 'settings_view' },
+    { id: 'staff', perm: 'staff_manage' }
+  ].find(item => item.id === store.activeView)
+  
+  if (activeItem && hasPermission(activeItem.perm)) {
+    return
+  }
+  
+  const firstAvailable = [
+    { id: 'dashboard', perm: 'dashboard_view' },
+    { id: 'bookings', perm: 'bookings_view' },
+    { id: 'calendar', perm: 'calendar_view' },
+    { id: 'customers', perm: 'customers_view' },
+    { id: 'packages', perm: 'packages_view' },
+    { id: 'payments', perm: 'payments_view' },
+    { id: 'settings', perm: 'settings_view' },
+    { id: 'staff', perm: 'staff_manage' }
+  ].find(item => hasPermission(item.perm))
+  
+  if (firstAvailable) {
+    store.activeView = firstAvailable.id
+  } else {
+    handleLogout()
+  }
+}
+
+const handleLoginSuccess = (loginResult) => {
+  if (loginResult.type === 'demo-staff') {
     const demoOwner = {
       id: 'owner_demo',
       ownerName: 'Demo Owner',
@@ -42,16 +81,32 @@ const handleLoginSuccess = (owner) => {
       capacity: 1200,
       phone: '042-36601234'
     }
-    
-    // Set session first
     setSession(demoOwner)
-    // Seed demo bookings and packages
     seedDemoData()
+    const sarah = store.staff.find(s => s.email === 'sarah@palace.com')
+    setSession(demoOwner, sarah)
+  } else if (loginResult.isDemo || (loginResult.type === 'owner' && loginResult.data.isDemo)) {
+    const demoOwner = {
+      id: 'owner_demo',
+      ownerName: 'Demo Owner',
+      email: 'demo@palace.com',
+      hallName: 'Garrison Marquee & Banquet Hall',
+      hallType: 'marriage',
+      address: 'Khyber Road, Cantonment, Lahore, Pakistan',
+      capacity: 1200,
+      phone: '042-36601234'
+    }
+    setSession(demoOwner)
+    seedDemoData()
+  } else if (loginResult.type === 'staff') {
+    setSession(loginResult.owner, loginResult.staff)
+  } else if (loginResult.type === 'owner') {
+    setSession(loginResult.data)
   } else {
-    setSession(owner)
+    setSession(loginResult)
   }
   
-  store.activeView = 'dashboard'
+  enforceInitialView()
 }
 
 const handleLogout = () => {
@@ -111,16 +166,29 @@ const handleCalendarCreateBooking = (dateStr) => {
   })
 }
 
-// Navigation list definitions
-const navigationItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { id: 'bookings', label: 'Bookings', icon: 'bookings' },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-  { id: 'customers', label: 'Customers', icon: 'customers' },
-  { id: 'packages', label: 'Packages', icon: 'packages' },
-  { id: 'payments', label: 'Payments', icon: 'payments' },
-  { id: 'settings', label: 'Settings', icon: 'settings' }
-]
+// Active User Helpers
+const activeUserName = computed(() => {
+  return store.currentStaff ? store.currentStaff.name : (store.currentOwner?.ownerName || 'User')
+})
+
+const activeUserEmail = computed(() => {
+  return store.currentStaff ? store.currentStaff.email : (store.currentOwner?.email || '')
+})
+
+// Dynamic navigation list based on permissions
+const visibleNavigationItems = computed(() => {
+  const allItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', perm: 'dashboard_view' },
+    { id: 'bookings', label: 'Bookings', icon: 'bookings', perm: 'bookings_view' },
+    { id: 'calendar', label: 'Calendar', icon: 'calendar', perm: 'calendar_view' },
+    { id: 'customers', label: 'Customers', icon: 'customers', perm: 'customers_view' },
+    { id: 'packages', label: 'Packages', icon: 'packages', perm: 'packages_view' },
+    { id: 'payments', label: 'Payments', icon: 'payments', perm: 'payments_view' },
+    { id: 'settings', label: 'Settings', icon: 'settings', perm: 'settings_view' },
+    { id: 'staff', label: 'Staff & Roles', icon: 'shield', perm: 'staff_manage' }
+  ]
+  return allItems.filter(item => hasPermission(item.perm))
+})
 
 const getNotificationBadgeClass = (severity) => {
   if (severity === 'danger') return 'badge-danger'
@@ -146,7 +214,7 @@ const getNotificationBadgeClass = (severity) => {
 
         <nav class="sidebar-nav">
           <button 
-            v-for="item in navigationItems" 
+            v-for="item in visibleNavigationItems" 
             :key="item.id"
             :class="{ active: store.activeView === item.id }"
             @click="navigateTo(item.id)"
@@ -242,24 +310,24 @@ const getNotificationBadgeClass = (severity) => {
             <div class="dropdown-wrapper">
               <button @click="userDropdownOpen = !userDropdownOpen; notificationsOpen = false" class="header-profile-btn">
                 <div class="profile-avatar">
-                  {{ store.currentOwner?.ownerName.charAt(0).toUpperCase() }}
+                  {{ activeUserName.charAt(0).toUpperCase() }}
                 </div>
-                <span class="profile-name-span">{{ store.currentOwner?.ownerName.split(' ')[0] }}</span>
+                <span class="profile-name-span">{{ activeUserName.split(' ')[0] }}</span>
                 <Icons name="plus" :size="12" style="transform: rotate(45deg); margin-left: 2px;" />
               </button>
 
               <!-- User Menu Dropdown Panel -->
               <div v-if="userDropdownOpen" class="dropdown-panel user-panel animate-scale">
                 <div class="user-panel-info">
-                  <h4>{{ store.currentOwner?.ownerName }}</h4>
-                  <p>{{ store.currentOwner?.email }}</p>
+                  <h4>{{ activeUserName }}</h4>
+                  <p>{{ activeUserEmail }}</p>
                 </div>
                 <hr class="drop-divider" />
-                <button @click="navigateTo('settings')" class="drop-item">
+                <button v-if="hasPermission('settings_view')" @click="navigateTo('settings')" class="drop-item">
                   <Icons name="settings" :size="16" />
                   <span>Venue Settings</span>
                 </button>
-                <button @click="navigateTo('packages')" class="drop-item">
+                <button v-if="hasPermission('packages_view')" @click="navigateTo('packages')" class="drop-item">
                   <Icons name="packages" :size="16" />
                   <span>Configure Packages</span>
                 </button>
@@ -304,12 +372,18 @@ const getNotificationBadgeClass = (severity) => {
           <Settings 
             v-else-if="store.activeView === 'settings'" 
           />
+          <Staff 
+            v-else-if="store.activeView === 'staff'" 
+          />
         </main>
 
         <!-- Bottom Navigation Bar Overlay (Mobile Screens Only) -->
-        <nav class="mobile-bottom-nav no-print">
+        <nav 
+          class="mobile-bottom-nav no-print" 
+          :style="{ gridTemplateColumns: `repeat(${visibleNavigationItems.length}, 1fr)` }"
+        >
           <button 
-            v-for="item in navigationItems.slice(0, 5)" 
+            v-for="item in visibleNavigationItems" 
             :key="'mobile-' + item.id"
             :class="{ active: store.activeView === item.id }"
             @click="navigateTo(item.id)"
@@ -318,15 +392,6 @@ const getNotificationBadgeClass = (severity) => {
             <Icons :name="item.icon" :size="20" />
             <span>{{ item.label }}</span>
             <span v-if="item.id === 'bookings' && store.notifications.length > 0" class="m-alert-dot"></span>
-          </button>
-          
-          <button 
-            :class="{ active: store.activeView === 'settings' }"
-            @click="navigateTo('settings')"
-            class="m-nav-item"
-          >
-            <Icons name="settings" :size="20" />
-            <span>Settings</span>
           </button>
         </nav>
       </div>
